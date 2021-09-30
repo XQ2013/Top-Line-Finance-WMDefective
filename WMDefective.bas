@@ -1,11 +1,12 @@
-Sub wm()
+
+Sub wmDefective()
 
 
 '' Get all excel lists
 Dim fileNamesCol As New Collection
 Dim MyFile As Variant  'Strings and primitive data types aren't allowed with collection
 
-filepath = "C:\Users\katy.ouyang\Downloads\WM 20210917\"
+filepath = Application.ActiveWorkbook.Path & "\"
 MyFile = Dir$(filepath & "*.xlsx")
 Do While MyFile <> ""
     fileNamesCol.Add (Replace(MyFile, ".xlsx", ""))
@@ -27,7 +28,7 @@ ws.Range("A1:X1").Value = header
 'open Item Check
 Dim checkWb As Workbook
 Dim check As Worksheet
-Set checkWb = Workbooks.Open("Walmart Item Check 2021.xlsx")
+Set checkWb = Workbooks.Open(filepath & "Walmart Item Check 2021.xlsx")
 Set check = checkWb.Sheets("ItemBasicInfoWalmartDSVReportR")
 
 
@@ -43,17 +44,65 @@ Dim defectiveQty As Integer
 Dim lName As Integer
 Dim name As String
 
+''enter date, CK #, item check file through msgbox
+
+
 
 For Each MyFile In fileNamesCol
+  'Walmart
 
   If (Left(fileNamesCol(i), 1) = 9) And (Len(fileNamesCol(i)) = 10) Then
+    Set srcWb = Workbooks.Open(filepath & fileNamesCol(i) & ".xlsx")
+    Set src = srcWb.Sheets("Sheet1")
 
+    nRow = ws.Range("C" & ws.Rows.Count).End(xlUp).Row + 1
+    ws.Range("c" & nRow).Value = _
+    "Wal-Mart Stores Inc (Dot Com) : Wal-Mart.com (DSV)"
+    ws.Range("D" & nRow).Value = "4/8/2021" ''date needs to be input
+    ws.Range("F" & nRow).Value = "Dot Com"
+    ws.Range("G" & nRow).Value = "IL-S"
+    ws.Range("H" & nRow).Value = "USD"
+    ws.Range("I" & nRow).Value = "1"
+    ws.Range("J" & nRow).Value = "FALSE"
+    ws.Range("K" & nRow).Value = "FALSE"
+    ws.Range("L" & nRow).Value = "FALSE"
+    ws.Range("M" & nRow).Value = "Defective Return CK# " ''
+    ws.Range("N" & nRow).Value = "Mdse. Return>" & fileNamesCol(i)
+    ws.Range("O" & nRow).Value = "Ad-Hoc Defective"
+    ws.Range("P" & nRow).Value = "1"
+    ws.Range("Q" & nRow).Value = "Custom"
 
+    ' get DEFECTIVE MDSE info
+    lDefective = _
+    Application.Match("MERCHANDISE RETURN - DEFECTIVE MERCHANDISE", _
+    src.Range("B:B"), 0)
+    defectiveQty = src.Cells(lDefective, 8).Value
+    rate = -src.Cells(lDefective, 7).Value
+    ws.Range("R" & nRow).Value = rate
+    ws.Range("S" & nRow).Value = rate
+    'get Description
+    lName = Application.Match(src.Cells(lDefective, 5), check.Range("a:a"), 0)
+    name = check.Cells(lName, 2).Value
+    ws.Range("T" & nRow).Value = name
+
+    ws.Range("U" & nRow).Value = "FALSE"
+
+    'if qty > 1, multple lines
+    If defectiveQty > 1 Then
+      For j = 1 To defectiveQty - 1
+        nRow = ws.Range("C" & ws.Rows.Count).End(xlUp).Row + 1
+        ws.Rows(nRow - 1).Copy
+        ws.Rows(nRow).PasteSpecial xlPasteAll
+        Application.CutCopyMode = False
+      Next j
+    End If
+
+    srcWb.Close
 
 
   '' Sam's Club
   ElseIf (Left(fileNamesCol(i), 1) = 1) And (Len(fileNamesCol(i)) = 10) Then
-    Set srcWb = Workbooks.Open(fileNamesCol(i) & ".xlsx")
+    Set srcWb = Workbooks.Open(filepath & fileNamesCol(i) & ".xlsx")
     Set src = srcWb.Sheets("Sheet1")
 
     nRow = ws.Range("C" & ws.Rows.Count).End(xlUp).Row + 1
@@ -87,8 +136,8 @@ For Each MyFile In fileNamesCol
     ws.Range("U" & nRow).Value = "FALSE"
 
     'if qty > 1, multple lines
-    If lDefective > 1 Then
-      For j = 1 To lDefective - 1
+    If defectiveQty > 1 Then
+      For j = 1 To defectiveQty - 1
         nRow = ws.Range("C" & ws.Rows.Count).End(xlUp).Row + 1
         ws.Rows(nRow - 1).Copy
         ws.Rows(nRow).PasteSpecial xlPasteAll
@@ -98,7 +147,7 @@ For Each MyFile In fileNamesCol
 
     'if handling applied
     lHandling = Application.Match("HANDLING CHARGE APPLIED", src.Range("a:a"), 0)
-    If Not IsError(lHandling) Then '<<< test for no match here
+    If lHandling > 0 Then '<<< test for no match here
       nRow = ws.Range("C" & ws.Rows.Count).End(xlUp).Row + 1
       ws.Rows(nRow - 1).Copy
       ws.Rows(nRow).PasteSpecial xlPasteAll
@@ -108,10 +157,11 @@ For Each MyFile In fileNamesCol
       ws.Cells(nRow, 18).Value = -src.Cells(lHandling + 2, 4).Value
       ws.Cells(nRow, 19).Value = -src.Cells(lHandling + 2, 4).Value
     End If
+    lHandling = 0
 
       'if freight applied
     lFreight = Application.Match("FREIGHT CHARGE APPLIED", src.Range("a:a"), 0)
-    If Not IsError(lFreight) Then '<<< test for no match here
+    If lFreight > 0 Then '<<< test for no match here
       nRow = ws.Range("C" & ws.Rows.Count).End(xlUp).Row + 1
       ws.Rows(nRow - 1).Copy
       ws.Rows(nRow).PasteSpecial xlPasteAll
@@ -121,6 +171,7 @@ For Each MyFile In fileNamesCol
       ws.Cells(nRow, 18).Value = -src.Cells(lFreight + 2, 4).Value
       ws.Cells(nRow, 19).Value = -src.Cells(lFreight + 2, 4).Value
     End If
+    lFreight = 0
 
     srcWb.Close
 
@@ -130,6 +181,14 @@ For Each MyFile In fileNamesCol
 
 Next MyFile
 
+'' add ids
+
+
+
 End Sub
+
+
+
+
 
 
